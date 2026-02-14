@@ -69,8 +69,25 @@ ipcMain.on('overlay-ready', (event) => {
     schedulerService.handleOverlayReady(event);
 });
 
-// App lifecycle
-app.whenReady().then(() => {
+
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window.
+    const mainWindow = BrowserWindow.getAllWindows().find(w => !w.isDestroyed());
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // App lifecycle
+  app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.electron');
 
     app.on('browser-window-created', (_, window) => {
@@ -134,7 +151,8 @@ app.whenReady().then(() => {
     app.on('before-quit', () => {
         isQuitting = true;
     });
-});
+  });
+}
 
 app.on('window-all-closed', () => {
     // Keep app running in background (don't quit) unless explicit quit

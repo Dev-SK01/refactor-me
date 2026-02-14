@@ -1,7 +1,7 @@
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { useToastStore } from '../stores/useToastStore';
 import { Monitor, Move, Hand, User, Save } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from './layout/Header';
 import { TimerCard } from './timer/TimerCard';
 import { GlobalPreferencesCard } from './preferences/GlobalPreferencesCard';
@@ -13,6 +13,13 @@ export const Dashboard = () => {
   const [isDirty, setIsDirty] = useState(false);
 
   console.log('Dashboard Render. isRunning:', isRunning);
+
+  // Sync local state with store when settings are loaded/updated from main process
+  useEffect(() => {
+    if (!isDirty) {
+      setLocalSettings(settings);
+    }
+  }, [settings, isDirty]);
 
   const handleTimerChange = (key: keyof typeof settings.timers, value: number) => {
     const newSettings = {

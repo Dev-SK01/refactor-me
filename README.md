@@ -1,6 +1,6 @@
 # RefactorMe: Developer Wellness Protocol
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Version](https://img.shields.io/badge/version-0.0.0-green.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![Version](https://img.shields.io/badge/version-1.0.0-green.svg)
 
 **RefactorMe** is a developer-focused wellness application designed to prevent burnout and Repetitive Strain Injury (RSI). It enforces regular breaks using a non-intrusive timer that transitions into a mandatory, full-screen overlay when it's time to rest. Built with Electron, React, and TypeScript, it sits quietly in your system tray until you need it.
 
