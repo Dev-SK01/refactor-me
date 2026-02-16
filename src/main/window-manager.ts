@@ -117,8 +117,19 @@ export class WindowManager {
   }
 
   closeOverlay() {
-    if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
-      this.overlayWindow.close();
+    console.log('[WindowManager] closeOverlay called');
+    try {
+      if (this.overlayWindow && !this.overlayWindow.isDestroyed()) {
+        console.log('[WindowManager] Closing overlay window');
+        this.overlayWindow.close();
+        this.overlayWindow = null;
+      } else {
+        console.log('[WindowManager] Overlay window not found or already destroyed');
+        this.overlayWindow = null;
+      }
+    } catch (error) {
+      console.error('[WindowManager] Error closing overlay window:', error);
+      // Force null if error occurs to prevent stuck state
       this.overlayWindow = null;
     }
   }

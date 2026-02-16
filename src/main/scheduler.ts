@@ -22,7 +22,11 @@ const BREAK_DETAILS: Record<string, { title: string; description: string }> = {
 };
 
 export class SchedulerService {
-  private timers: NodeJS.Timeout[] = [];
+  private timers = new Map<string, NodeJS.Timeout>();
+  private timerStartTimes = new Map<string, number>();
+  private timerDurations = new Map<string, number>();
+  private breakQueue: string[] = [];
+
   private isBreakActive: boolean = false;
   private currentBreakType: string | null = null;
   private currentBreakSettings: { strictMode: boolean, duration: number } | null = null;
@@ -30,8 +34,6 @@ export class SchedulerService {
 
   constructor() {
     // this.startTimers(); // Moved to app.whenReady()
-    // Optional: Monitor system idle time to pause/reset timers
-    // setInterval(() => this.checkIdleState(), 1000 * 60);
   }
 
   startTimers(): boolean {
@@ -45,71 +47,127 @@ export class SchedulerService {
       return false;
     }
 
-    // Visual Health Timer
+    console.log('[Scheduler] Starting timers with settings:', settings.timers);
+
+    // Schedule all enabled timers
+    // We use the full duration from settings for initial start
     this.scheduleTimer('visual', settings.timers.visual * 60 * 1000);
-    
-    // Posture Timer
     this.scheduleTimer('posture', settings.timers.posture * 60 * 1000);
-
-    // Wrist Timer
     this.scheduleTimer('wrist', settings.timers.wrist * 60 * 1000);
-
-    // Lower Body Timer
     this.scheduleTimer('lowerBody', settings.timers.lowerBody * 60 * 1000);
     
     return true;
   }
 
   stopTimers() {
+    console.log('[Scheduler] Stopping all timers');
     this.isRunning = false;
     this.timers.forEach(clearTimeout);
-    this.timers = [];
+    this.timers.clear();
+    this.timerStartTimes.clear();
+    this.timerDurations.clear();
+    this.breakQueue = [];
   }
 
   scheduleTimer(type: string, duration: number) {
+    if (this.timers.has(type)) {
+      clearTimeout(this.timers.get(type)!);
+    }
+
+    console.log(`[Scheduler] Scheduling timer '${type}' for ${(duration / 60000).toFixed(2)} mins (${duration}ms)`);
+
+    this.timerStartTimes.set(type, Date.now());
+    this.timerDurations.set(type, duration);
+
     const timer = setTimeout(() => {
       this.triggerBreak(type);
-      // Reschedule after break (handled by break completion/dismissal)
     }, duration);
-    this.timers.push(timer);
+    
+    this.timers.set(type, timer);
+  }
+
+  pauseAllTimers() {
+    console.log('[Scheduler] Pausing all timers');
+    // Pause all currently running timers (except the one that might be triggering, though this is usually called after clearing)
+    // We iterate over the map keys to correctly capture state
+    for (const [type, timer] of this.timers.entries()) {
+      clearTimeout(timer);
+      const startTime = this.timerStartTimes.get(type) || Date.now();
+      const scheduledDuration = this.timerDurations.get(type) || 0;
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, scheduledDuration - elapsed);
+
+      // Store remaining time to resume later
+      this.timerDurations.set(type, remaining);
+    }
+    this.timers.clear();
+    // Start times are no longer relevant until resumed
+    this.timerStartTimes.clear();
+  }
+
+  resumeAllTimers() {
+     console.log('[Scheduler] Resuming all timers');
+     // Resume timers based on their stored 'remaining' duration
+     for (const [type, remaining] of this.timerDurations.entries()) {
+       if (remaining > 0) {
+         this.scheduleTimer(type, remaining);
+       }
+     }
   }
 
   triggerBreak(type: string) {
-    if (this.isBreakActive) return; // Don't interrupt existing break? Or queue?
+    console.log(`[Scheduler] Triggering break: ${type}`);
+    // If a break is already active, queue this one
+    if (this.isBreakActive) {
+      // Don't queue if already in queue
+      if (!this.breakQueue.includes(type)) {
+          this.breakQueue.push(type);
+          console.log(`[Scheduler] Break active, queueing ${type}. Queue: ${this.breakQueue}`);
+      }
+      return; 
+    }
 
+    // Remove the triggered timer from tracking so we don't try to pause/resume it as "running"
+    if (this.timers.has(type)) {
+        this.timers.delete(type);
+    }
+    
+    // Prepare for break
     this.isBreakActive = true;
     this.currentBreakType = type;
-    const settings = storeService.getSettings();
     
-    // Default break duration 20s for visual, maybe more for others? 
-    // Let's default to 20s for now as per the "20-20-20 rule" in the UI.
-    // Get configured duration or default to 20s
+    const settings = storeService.getSettings();
     // @ts-ignore
     const breakDuration = settings.durations?.[type] ?? 20;
-    
+
     this.currentBreakSettings = {
         strictMode: settings.strictMode,
         duration: breakDuration
     };
 
-    // Notify Renderer to show content for specific type
+    // STRICT MODE LOGIC:
+    // If strict mode is ON, we pause all other timers so "work time" doesn't pass during break.
+    // If OFF, we let them run. If another triggers, it enters the queue.
+    if (settings.strictMode) {
+        this.pauseAllTimers();
+    }
+
+    // Notify Renderer
     const overlay = windowManager.createOverlayWindow(settings.strictMode);
     
-    // For strict mode, we might want to ensure focus
     if (settings.strictMode) {
       overlay.setAlwaysOnTop(true, 'screen-saver');
       overlay.focus();
     }
     
-    // We wait for 'overlay-ready' event from renderer before sending data
-    // This prevents the race condition where we send data before the listener is set up
-    console.log(`Scheduler: Triggered break '${type}', waiting for overlay ready...`);
+    console.log(`[Scheduler] Break '${type}' started. Duration: ${breakDuration}s. Strict: ${settings.strictMode}`);
   }
 
   handleOverlayReady(event: Electron.IpcMainEvent) {
-      console.log('Scheduler: Overlay reported ready');
+      // Same as before
+      console.log('[Scheduler] Overlay reported ready');
        if (this.isBreakActive && this.currentBreakType && this.currentBreakSettings) {
-          console.log(`Scheduler: Sending break data to overlay: ${this.currentBreakType}`);
+          console.log(`[Scheduler] Sending break data to overlay: ${this.currentBreakType}`);
           const details = BREAK_DETAILS[this.currentBreakType] || { title: 'Break Time', description: 'Take a moment to relax.' };
           
           event.reply('break-trigger', { 
@@ -122,22 +180,58 @@ export class SchedulerService {
       }
   }
 
+  closeBreak(finished: boolean) {
+      console.log(`[Scheduler] Closing break. Finished: ${finished}`);
+      const settings = storeService.getSettings(); // Get FRESH settings in case they changed, though mostly we care about what mode we STARTED in or current state.
+      // Actually, we should respect the mode we were IN.
+      // But for simplicity, let's assume we use the cached settings or look at current. 
+      // If we paused timers (strict mode), we must resume them.
+      // If we didn't pause (non-strict), we leave them be.
+      
+      const wasStrictMode = this.currentBreakSettings?.strictMode ?? false;
+
+      this.isBreakActive = false;
+      console.log('[Scheduler] Calling windowManager.closeOverlay()');
+      windowManager.closeOverlay();
+      
+      const completedType = this.currentBreakType;
+      this.currentBreakType = null;
+      this.currentBreakSettings = null;
+
+      // 1. Resume others if needed
+      if (wasStrictMode) {
+          this.resumeAllTimers();
+      }
+
+      // 2. Restart the completed timer (Fresh cycle)
+      if (completedType && settings.timers && (settings.timers as any)[completedType]) {
+          const fullDuration = (settings.timers as any)[completedType] * 60 * 1000;
+          this.scheduleTimer(completedType, fullDuration);
+      }
+
+      // 3. Update Stats
+      storeService.updateStats(finished ? 'total' : 'skipped');
+
+      // 4. Process Queue
+      if (this.breakQueue.length > 0) {
+          const nextType = this.breakQueue.shift();
+          if (nextType) {
+              // Trigger next break immediately
+              // We use setTimeout to allow run loop to clear/UI to update if needed, but immediate is usually fine
+              console.log(`[Scheduler] Processing queued break: ${nextType}`);
+              setTimeout(() => this.triggerBreak(nextType), 500);
+          }
+      }
+  }
+
   completeBreak() {
-    this.isBreakActive = false;
-    this.currentBreakType = null;
-    this.currentBreakSettings = null;
-    windowManager.closeOverlay();
-    this.startTimers(); // Restart timers
-    storeService.updateStats('total');
+      console.log('[Scheduler] completeBreak called');
+      this.closeBreak(true);
   }
 
   skipBreak() {
-    this.isBreakActive = false;
-    this.currentBreakType = null;
-    this.currentBreakSettings = null;
-    windowManager.closeOverlay();
-    this.startTimers(); // Restart timers
-    storeService.updateStats('skipped');
+      console.log('[Scheduler] skipBreak called');
+      this.closeBreak(false);
   }
 }
 

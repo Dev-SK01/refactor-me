@@ -37,6 +37,7 @@ export const Overlay = () => {
   const [timeLeft, setTimeLeft] = useState(-1);
   const [breakType, setBreakType] = useState('visual');
   const [details, setDetails] = useState({ title: '', description: '' });
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     // Notify main process that overlay is ready to receive data
@@ -110,13 +111,16 @@ export const Overlay = () => {
             {details.description}
           </p>
 
-           {timeLeft === 0 && (
+             {timeLeft === 0 && (
              <motion.button 
                initial={{ opacity: 0, scale: 0.9 }}
                animate={{ opacity: 1, scale: 1 }}
                whileHover={{ scale: 1.05 }}
                whileTap={{ scale: 0.95 }}
+               disabled={isExiting}
                onClick={async () => {
+                 if (isExiting) return;
+                 setIsExiting(true);
                  console.log('Overlay: "Im Back" clicked');
                  try {
                     // @ts-ignore
@@ -127,14 +131,16 @@ export const Overlay = () => {
                         console.log('Overlay: break-complete invoked');
                     } else {
                         console.error('Overlay: ipcRenderer not found!');
+                        setIsExiting(false);
                     }
                  } catch (error) {
                     console.error('Overlay: Error handling break completion:', error);
+                    setIsExiting(false);
                  }
                }}
-               className="mt-12 px-10 py-4 bg-emerald-600! hover:bg-emerald-500 rounded-full font-bold text-xl transition-all shadow-lg hover:shadow-emerald-500/25 cursor-pointer titlebar-no-drag"
+               className={`mt-12 px-10 py-4 rounded-full font-bold text-xl transition-all shadow-lg cursor-pointer titlebar-no-drag ${isExiting ? 'bg-zinc-500 cursor-not-allowed' : 'bg-emerald-600! hover:bg-emerald-500 hover:shadow-emerald-500/25'}`}
              >
-               I'm Back
+               {isExiting ? 'Resuming...' : "I'm Back"}
              </motion.button>
            )}
         </motion.div>
