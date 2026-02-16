@@ -5,6 +5,8 @@
 **RefactorMe** is a developer-focused wellness application designed to prevent burnout and Repetitive Strain Injury (RSI). It enforces regular breaks using a non-intrusive timer that transitions into a mandatory, full-screen overlay when it's time to rest. Built with Electron, React, and TypeScript, it sits quietly in your system tray until you need it.
 
 ![Application Screenshot](src/assets/logo.png) _<!-- Replace with actual screenshot in future -->_
+![Windows Screenshot]([images/screenshot.png](https://github.com/Dev-SK01/refactor-me/blob/master/screenshots/Screenshot%202026-02-14%20161136.png))
+![Break Overlay](https://github.com/Dev-SK01/refactor-me/blob/master/screenshots/Screenshot%202026-02-14%20113733.png)
 
 ## 🚀 Features
 
