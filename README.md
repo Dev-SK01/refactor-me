@@ -132,5 +132,5 @@ We welcome contributions! Please follow these steps to contribute:
 
 ## Download Lastest Release
 - **[Virus Total](https://www.virustotal.com/gui/file/035ea02d158fa1013fae1a775d503f7c8d25e1ce09465c0b1facdb08b5debae2/detection)**: Check Virus Free.
-- **[windows](https://drive.proton.me/urls/6KMFVWRQ08#lsUavMs2T4kx)**: Download windows executable.
-Distributed under the MIT License. See `LICENSE` for more information.
+- **[windows](https://drive.proton.me/urls/6KMFVWRQ08#lsUavMs2T4kx)**:
+- Download windows executable. Distributed under the MIT License. See `LICENSE` for more information.
